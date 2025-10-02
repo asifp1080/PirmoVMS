@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Spanish translations -->
+    <string name="app_name">VMS Kiosco</string>
+    
+    <!-- Attract Screen -->
+    <string name="attract_subtitle">Toque un botón a continuación para comenzar</string>
+    <string name="touch_to_start">Toque para comenzar</string>
+    <string name="check_in">Registrarse</string>
+    <string name="check_in_subtitle">Estoy aquí para una visita</string>
+    <string name="check_out">Salir</string>
+    <string name="check_out_subtitle">Me voy ahora</string>
+    
+    <!-- Check-in Flow -->
+    <string name="visitor_check_in">Registro de Visitante</string>
+    <string name="language_selection">Seleccione su idioma</string>
+    <string name="visit_purpose">¿Cuál es el propósito de su visita?</string>
+    <string name="visitor_details">Por favor proporcione sus datos</string>
+    <string name="host_selection">¿A quién viene a ver?</string>
+    <string name="photo_capture">Tomemos su foto</string>
+    <string name="agreements">Por favor revise y firme</string>
+    <string name="review_details">Por favor revise su información</string>
+    <string name="check_in_success">¡Bienvenido! Ya está todo listo</string>
+    
+    <!-- Form Fields -->
+    <string name="first_name">Nombre</string>
+    <string name="last_name">Apellido</string>
+    <string name="company">Empresa</string>
+    <string name="email">Correo electrónico</string>
+    <string name="phone">Teléfono</string>
+    <string name="search_host">Busque a su anfitrión</string>
+    
+    <!-- Visit Purposes -->
+    <string name="purpose_meeting">Reunión</string>
+    <string name="purpose_interview">Entrevista</string>
+    <string name="purpose_delivery">Entrega</string>
+    <string name="purpose_guest">Visita de invitado</string>
+    <string name="purpose_other">Otro</string>
+    
+    <!-- Navigation -->
+    <string name="next">Siguiente</string>
+    <string name="back">Atrás</string>
+    <string name="cancel">Cancelar</string>
+    <string name="confirm">Confirmar</string>
+    <string name="finish">Finalizar</string>
+    <string name="retry">Reintentar</string>
+    
+    <!-- Languages -->
+    <string name="language_english">English</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_chinese">中文</string>
+</resources>

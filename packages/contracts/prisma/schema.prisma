@@ -1,0 +1,392 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum EmployeeRole {
+  ADMIN
+  RECEPTIONIST
+  SECURITY
+  MANAGER
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum VisitPurpose {
+  MEETING
+  INTERVIEW
+  DELIVERY
+  GUEST
+  OTHER
+}
+
+enum VisitStatus {
+  PRE_REGISTERED
+  CHECKED_IN
+  CHECKED_OUT
+  NO_SHOW
+}
+
+enum AgreementType {
+  NDA
+  SAFETY
+  PRIVACY
+}
+
+enum NotificationChannelType {
+  SMS
+  EMAIL
+  SLACK
+  TEAMS
+}
+
+enum NotificationEventType {
+  HOST_ALERT
+  VISITOR_CONFIRMATION
+  CHECKOUT_ALERT
+}
+
+enum NotificationStatus {
+  SENT
+  FAILED
+  PENDING
+}
+
+enum ActorType {
+  USER
+  KIOSK
+  SYSTEM
+}
+
+enum OrganizationPlan {
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+// Core Models
+model Organization {
+  id           String           @id @default(cuid())
+  name         String
+  slug         String           @unique
+  plan         OrganizationPlan @default(STARTER)
+  settings     Json?
+  created_at   DateTime         @default(now())
+  updated_at   DateTime         @updatedAt
+  deleted_at   DateTime?
+
+  // Relations
+  locations            Location[]
+  employees            Employee[]
+  visitors             Visitor[]
+  visits               Visit[]
+  agreements           Agreement[]
+  notification_channels NotificationChannel[]
+  notification_events  NotificationEvent[]
+  kiosk_devices        KioskDevice[]
+  webhooks             Webhook[]
+  audit_logs           AuditLog[]
+
+  @@map("organizations")
+}
+
+model Location {
+  id          String    @id @default(cuid())
+  org_id      String
+  name        String
+  time_zone   String    @default("UTC")
+  address     Json?
+  settings    Json?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  deleted_at  DateTime?
+  created_by  String?
+  updated_by  String?
+
+  // Relations
+  organization  Organization  @relation(fields: [org_id], references: [id], onDelete: Cascade)
+  employees     Employee[]
+  visits        Visit[]
+  kiosk_devices KioskDevice[]
+
+  @@index([org_id])
+  @@index([org_id, deleted_at])
+  @@map("locations")
+}
+
+model Employee {
+  id          String         @id @default(cuid())
+  org_id      String
+  location_id String?
+  first_name  String
+  last_name   String
+  email       String
+  phone       String?
+  role        EmployeeRole   @default(RECEPTIONIST)
+  is_host     Boolean        @default(false)
+  status      EmployeeStatus @default(ACTIVE)
+  avatar_url  String?
+  created_at  DateTime       @default(now())
+  updated_at  DateTime       @updatedAt
+  deleted_at  DateTime?
+  created_by  String?
+  updated_by  String?
+
+  // Relations
+  organization Organization @relation(fields: [org_id], references: [id], onDelete: Cascade)
+  location     Location?    @relation(fields: [location_id], references: [id])
+  hosted_visits Visit[]     @relation("HostEmployee")
+  audit_logs   AuditLog[]
+
+  @@unique([org_id, email])
+  @@index([org_id])
+  @@index([org_id, deleted_at])
+  @@index([org_id, is_host])
+  @@map("employees")
+}
+
+model Visitor {
+  id               String    @id @default(cuid())
+  org_id           String
+  first_name       String
+  last_name        String
+  email_encrypted  String? // Encrypted PII
+  phone_encrypted  String? // Encrypted PII
+  company          String?
+  photo_url        String?
+  preferred_language String @default("en")
+  notes            String?
+  marketing_opt_in Boolean   @default(false)
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+  deleted_at       DateTime?
+  created_by       String?
+  updated_by       String?
+
+  // Relations
+  organization Organization @relation(fields: [org_id], references: [id], onDelete: Cascade)
+  visits       Visit[]
+
+  @@index([org_id])
+  @@index([org_id, deleted_at])
+  @@index([org_id, email_encrypted])
+  @@map("visitors")
+}
+
+model Visit {
+  id               String      @id @default(cuid())
+  org_id           String
+  location_id      String
+  visitor_id       String
+  host_employee_id String?
+  purpose          VisitPurpose @default(MEETING)
+  pre_registered   Boolean     @default(false)
+  scheduled_start  DateTime?
+  check_in_time    DateTime?
+  check_out_time   DateTime?
+  status           VisitStatus @default(PRE_REGISTERED)
+  badge_number     String?
+  qr_code          String?     @unique
+  kiosk_device_id  String?
+  metadata         Json?
+  created_at       DateTime    @default(now())
+  updated_at       DateTime    @updatedAt
+  deleted_at       DateTime?
+  created_by       String?
+  updated_by       String?
+
+  // Relations
+  organization      Organization        @relation(fields: [org_id], references: [id], onDelete: Cascade)
+  location          Location            @relation(fields: [location_id], references: [id])
+  visitor           Visitor             @relation(fields: [visitor_id], references: [id])
+  host_employee     Employee?           @relation("HostEmployee", fields: [host_employee_id], references: [id])
+  kiosk_device      KioskDevice?        @relation(fields: [kiosk_device_id], references: [id])
+  visit_agreements  VisitAgreement[]
+  notification_events NotificationEvent[]
+
+  @@index([org_id])
+  @@index([org_id, deleted_at])
+  @@index([org_id, status])
+  @@index([org_id, location_id])
+  @@index([org_id, visitor_id])
+  @@index([org_id, host_employee_id])
+  @@index([check_in_time])
+  @@index([scheduled_start])
+  @@map("visits")
+}
+
+model Agreement {
+  id          String        @id @default(cuid())
+  org_id      String
+  name        String
+  version     String        @default("1.0")
+  content_md  String
+  is_required Boolean       @default(true)
+  type        AgreementType
+  locales     Json? // JSON object with locale translations
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
+  deleted_at  DateTime?
+  created_by  String?
+  updated_by  String?
+
+  // Relations
+  organization     Organization     @relation(fields: [org_id], references: [id], onDelete: Cascade)
+  visit_agreements VisitAgreement[]
+
+  @@index([org_id])
+  @@index([org_id, deleted_at])
+  @@index([org_id, type])
+  @@map("agreements")
+}
+
+model VisitAgreement {
+  id                String    @id @default(cuid())
+  visit_id          String
+  agreement_id      String
+  signed_at         DateTime
+  signer_name       String
+  signer_email      String
+  signature_blob_url String?
+  ip_address        String?
+  user_agent        String?
+  created_at        DateTime  @default(now())
+
+  // Relations
+  visit     Visit     @relation(fields: [visit_id], references: [id], onDelete: Cascade)
+  agreement Agreement @relation(fields: [agreement_id], references: [id])
+
+  @@unique([visit_id, agreement_id])
+  @@index([visit_id])
+  @@index([agreement_id])
+  @@map("visit_agreements")
+}
+
+model NotificationChannel {
+  id              String                  @id @default(cuid())
+  org_id          String
+  type            NotificationChannelType
+  provider_config Json
+  is_default      Boolean                 @default(false)
+  created_at      DateTime                @default(now())
+  updated_at      DateTime                @updatedAt
+  deleted_at      DateTime?
+  created_by      String?
+  updated_by      String?
+
+  // Relations
+  organization        Organization        @relation(fields: [org_id], references: [id], onDelete: Cascade)
+  notification_events NotificationEvent[]
+
+  @@index([org_id])
+  @@index([org_id, deleted_at])
+  @@index([org_id, type])
+  @@map("notification_channels")
+}
+
+model NotificationEvent {
+  id         String                  @id @default(cuid())
+  org_id     String
+  visit_id   String?
+  type       NotificationEventType
+  channel_id String
+  payload    Json
+  status     NotificationStatus      @default(PENDING)
+  sent_at    DateTime?
+  created_at DateTime                @default(now())
+
+  // Relations
+  organization Organization        @relation(fields: [org_id], references: [id], onDelete: Cascade)
+  visit        Visit?              @relation(fields: [visit_id], references: [id])
+  channel      NotificationChannel @relation(fields: [channel_id], references: [id])
+
+  @@index([org_id])
+  @@index([org_id, status])
+  @@index([visit_id])
+  @@index([channel_id])
+  @@index([created_at])
+  @@map("notification_events")
+}
+
+model KioskDevice {
+  id                String    @id @default(cuid())
+  org_id            String
+  location_id       String
+  name              String
+  device_identifier String    @unique
+  app_version       String?
+  last_seen_at      DateTime?
+  settings          Json?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+  deleted_at        DateTime?
+  created_by        String?
+  updated_by        String?
+
+  // Relations
+  organization Organization @relation(fields: [org_id], references: [id], onDelete: Cascade)
+  location     Location     @relation(fields: [location_id], references: [id])
+  visits       Visit[]
+
+  @@index([org_id])
+  @@index([org_id, deleted_at])
+  @@index([org_id, location_id])
+  @@map("kiosk_devices")
+}
+
+model Webhook {
+  id         String    @id @default(cuid())
+  org_id     String
+  target_url String
+  secret     String
+  is_active  Boolean   @default(true)
+  events     Json // Array of event types to listen for
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+  created_by String?
+  updated_by String?
+
+  // Relations
+  organization Organization @relation(fields: [org_id], references: [id], onDelete: Cascade)
+
+  @@index([org_id])
+  @@index([org_id, deleted_at])
+  @@index([org_id, is_active])
+  @@map("webhooks")
+}
+
+model AuditLog {
+  id             String     @id @default(cuid())
+  org_id         String
+  actor_user_id  String?
+  actor_type     ActorType
+  action         String
+  entity         String
+  entity_id      String
+  changes        Json?
+  ip_address     String?
+  created_at     DateTime   @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [org_id], references: [id], onDelete: Cascade)
+  actor_user   Employee?    @relation(fields: [actor_user_id], references: [id])
+
+  @@index([org_id])
+  @@index([org_id, entity, entity_id])
+  @@index([org_id, actor_user_id])
+  @@index([created_at])
+  @@map("audit_logs")
+}

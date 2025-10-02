@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- VMS Brand Colors -->
+    <color name="vms_primary">#2563EB</color>
+    <color name="vms_primary_variant">#1D4ED8</color>
+    <color name="vms_secondary">#10B981</color>
+    <color name="vms_secondary_variant">#059669</color>
+    <color name="vms_error">#DC2626</color>
+    <color name="vms_warning">#F59E0B</color>
+    <color name="vms_success">#10B981</color>
+    
+    <!-- Neutral Colors -->
+    <color name="vms_gray_50">#F9FAFB</color>
+    <color name="vms_gray_100">#F3F4F6</color>
+    <color name="vms_gray_200">#E5E7EB</color>
+    <color name="vms_gray_300">#D1D5DB</color>
+    <color name="vms_gray_400">#9CA3AF</color>
+    <color name="vms_gray_500">#6B7280</color>
+    <color name="vms_gray_600">#4B5563</color>
+    <color name="vms_gray_700">#374151</color>
+    <color name="vms_gray_800">#1F2937</color>
+    <color name="vms_gray_900">#111827</color>
+    
+    <!-- Basic Colors -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="transparent">#00000000</color>
+    
+    <!-- Material Design Colors -->
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+</resources>

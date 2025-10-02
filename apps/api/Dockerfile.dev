@@ -1,0 +1,25 @@
+# Development Dockerfile for API
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies
+COPY package*.json ./
+COPY packages/contracts/package*.json ./packages/contracts/
+COPY packages/notifications/package*.json ./packages/notifications/
+
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Build packages
+RUN npm run build --workspace=packages/contracts
+RUN npm run build --workspace=packages/notifications
+
+# Generate Prisma client
+RUN npm run db:generate
+
+EXPOSE 3001
+
+CMD ["npm", "run", "start:dev"]

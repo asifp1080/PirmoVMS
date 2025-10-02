@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.VMSKiosk" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Customize your light theme here. -->
+        <item name="colorPrimary">@color/vms_primary</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/vms_secondary</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="colorError">@color/vms_error</item>
+        <item name="colorOnError">@color/white</item>
+        <item name="colorSurface">@color/vms_gray_50</item>
+        <item name="colorOnSurface">@color/vms_gray_900</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowBackground">@color/vms_gray_50</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">true</item>
+    </style>
+
+    <style name="Theme.VMSKiosk" parent="Base.Theme.VMSKiosk" />
+    
+    <!-- Kiosk specific styles -->
+    <style name="KioskButton" parent="Widget.Material3.Button">
+        <item name="android:minHeight">64dp</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="cornerRadius">12dp</item>
+    </style>
+    
+    <style name="KioskButton.Large">
+        <item name="android:minHeight">80dp</item>
+        <item name="android:textSize">20sp</item>
+    </style>
+    
+    <style name="KioskCard" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardCornerRadius">16dp</item>
+        <item name="cardElevation">8dp</item>
+        <item name="android:layout_margin">8dp</item>
+    </style>
+    
+    <style name="KioskTextField" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="android:textSize">18sp</item>
+        <item name="android:minHeight">56dp</item>
+    </style>
+    
+    <style name="KioskHeadline" parent="TextAppearance.Material3.HeadlineMedium">
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/vms_gray_900</item>
+    </style>
+    
+    <style name="KioskBody" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:textColor">@color/vms_gray_700</item>
+    </style>
+</resources>
