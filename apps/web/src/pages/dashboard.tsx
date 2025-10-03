@@ -1,76 +1,92 @@
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   Users, 
   UserCheck, 
   Clock, 
   TrendingUp, 
-  Plus,
-  Printer,
-  ArrowUpRight,
-  ArrowDownRight,
+  MapPin, 
+  Calendar,
+  Download,
+  RefreshCw
 } from 'lucide-react'
-import { formatDate, formatDuration, getInitials } from '@/lib/utils'
-import { useAuthStore } from '@/stores/auth-store'
-import { visitsApi } from '@/lib/api/client'
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-} from 'recharts'
+import { LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { format, subDays, startOfDay, endOfDay } from 'date-fns'
+import { useAuthStore } from '@/stores/auth'
+import { ConditionalRender } from '@/components/auth/ProtectedRoute'
+import apiClient from '@/lib/api-client'
+import type { VisitAnalytics } from '@vms/contracts'
 
-// Mock data for charts
-const weeklyData = [
-  { day: 'Mon', visits: 24 },
-  { day: 'Tue', visits: 32 },
-  { day: 'Wed', visits: 28 },
-  { day: 'Thu', visits: 45 },
-  { day: 'Fri', visits: 38 },
-  { day: 'Sat', visits: 12 },
-  { day: 'Sun', visits: 8 },
-]
-
-const hourlyData = [
-  { hour: '8AM', visits: 5 },
-  { hour: '9AM', visits: 12 },
-  { hour: '10AM', visits: 18 },
-  { hour: '11AM', visits: 22 },
-  { hour: '12PM', visits: 15 },
-  { hour: '1PM', visits: 8 },
-  { hour: '2PM', visits: 25 },
-  { hour: '3PM', visits: 28 },
-  { hour: '4PM', visits: 20 },
-  { hour: '5PM', visits: 10 },
-]
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8']
 
 export default function DashboardPage() {
   const { user } = useAuthStore()
-
-  // Fetch current visits
-  const { data: currentVisits, isLoading } = useQuery({
-    queryKey: ['visits', 'current'],
-    queryFn: () => visitsApi.list(user!.org_id, { 
-      status: 'CHECKED_IN',
-      limit: 10 
-    }),
-    enabled: !!user?.org_id,
+  const [dateRange, setDateRange] = useState({
+    from: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
+    to: format(new Date(), 'yyyy-MM-dd')
   })
 
-  // Mock stats - in real app, these would come from API
-  const stats = {
-    currentlyIn: 24,
-    todayArrivals: 67,
-    avgDuration: 125, // minutes
-    weeklyGrowth: 12.5,
+  const {
+    data: analytics,
+    isLoading,
+    error,
+    refetch
+  } = useQuery({
+    queryKey: ['analytics', user?.org_id, dateRange],
+    queryFn: () => apiClient.getVisitAnalytics(user!.org_id, {
+      period: 'day',
+      from_date: dateRange.from,
+      to_date: dateRange.to
+    }),
+    enabled: !!user?.org_id,
+    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
+  })
+
+  const {
+    data: recentVisits,
+    isLoading: isLoadingVisits
+  } = useQuery({
+    queryKey: ['recent-visits', user?.org_id],
+    queryFn: () => apiClient.getVisits(user!.org_id, {
+      limit: 10,
+      status: 'CHECKED_IN'
+    }),
+    enabled: !!user?.org_id,
+    refetchInterval: 30 * 1000, // Refetch every 30 seconds
+  })
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">
+            Welcome back! Here's what's happening with your visitors.
+          </p>
+        </div>
+        
+        <Alert variant="destructive">
+          <AlertDescription>
+            Failed to load dashboard data. Please try again.
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => refetch()}
+              className="ml-2"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    )
   }
 
   return (
@@ -79,182 +95,333 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
-            Welcome back, {user?.first_name}. Here's what's happening today.
+            Welcome back! Here's what's happening with your visitors.
           </p>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Register Visitor
+        
+        <ConditionalRender requiredPermissions={['report:export']}>
+          <Button onClick={() => handleExport('dashboard')}>
+            <Download className="h-4 w-4 mr-2" />
+            Export Report
           </Button>
-          <Button variant="outline">
-            <Printer className="mr-2 h-4 w-4" />
-            Print Badge
-          </Button>
-        </div>
+        </ConditionalRender>
       </div>
 
-      {/* Stats Cards */}
+      {/* Key Metrics */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Currently In</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.currentlyIn}</div>
-            <p className="text-xs text-muted-foreground">
-              Active visitors on-site
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Today's Arrivals</CardTitle>
-            <UserCheck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.todayArrivals}</div>
-            <p className="text-xs text-muted-foreground">
-              +{stats.weeklyGrowth}% from last week
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Duration</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatDuration(stats.avgDuration)}</div>
-            <p className="text-xs text-muted-foreground">
-              Average visit length
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Weekly Growth</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">+{stats.weeklyGrowth}%</div>
-            <p className="text-xs text-muted-foreground">
-              <ArrowUpRight className="inline h-3 w-3 text-green-500" />
-              Compared to last week
-            </p>
-          </CardContent>
-        </Card>
+        <MetricCard
+          title="Total Visits"
+          value={analytics?.total_visits}
+          icon={Users}
+          isLoading={isLoading}
+        />
+        <MetricCard
+          title="Unique Visitors"
+          value={analytics?.unique_visitors}
+          icon={UserCheck}
+          isLoading={isLoading}
+        />
+        <MetricCard
+          title="Avg Duration"
+          value={analytics?.average_duration ? `${Math.round(analytics.average_duration)} min` : undefined}
+          icon={Clock}
+          isLoading={isLoading}
+        />
+        <MetricCard
+          title="Currently Checked In"
+          value={recentVisits?.data?.length}
+          icon={TrendingUp}
+          isLoading={isLoadingVisits}
+        />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        {/* Currently In List */}
-        <Card className="col-span-4">
-          <CardHeader>
-            <CardTitle>Currently In Building</CardTitle>
-            <CardDescription>
-              Visitors who are currently checked in
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-3">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="flex items-center space-x-4">
-                    <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
-                    <div className="space-y-2 flex-1">
-                      <div className="h-4 bg-muted rounded animate-pulse" />
-                      <div className="h-3 bg-muted rounded w-2/3 animate-pulse" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {currentVisits?.data?.slice(0, 5).map((visit: any) => (
-                  <div key={visit.id} className="flex items-center space-x-4">
-                    <Avatar>
-                      <AvatarImage src={visit.visitor.photo_url} />
-                      <AvatarFallback>
-                        {getInitials(visit.visitor.first_name, visit.visitor.last_name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 space-y-1">
-                      <p className="text-sm font-medium leading-none">
-                        {visit.visitor.first_name} {visit.visitor.last_name}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {visit.visitor.company} • {visit.purpose}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <Badge variant="secondary">{visit.badge_number}</Badge>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {formatDate(visit.check_in_time, 'time')}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-                {(!currentVisits?.data || currentVisits.data.length === 0) && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No visitors currently checked in
-                  </div>
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="locations">Locations</TabsTrigger>
+          <TabsTrigger value="recent">Recent Activity</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Visit Trends</CardTitle>
+                <CardDescription>Daily visit counts over the selected period</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={analytics?.daily_counts || []}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="date" 
+                        tickFormatter={(value) => format(new Date(value), 'MMM dd')}
+                      />
+                      <YAxis />
+                      <Tooltip 
+                        labelFormatter={(value) => format(new Date(value), 'MMM dd, yyyy')}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="count" 
+                        stroke="#8884d8" 
+                        strokeWidth={2}
+                        dot={{ fill: '#8884d8' }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
                 )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
 
-        {/* Weekly Trend Chart */}
-        <Card className="col-span-3">
-          <CardHeader>
-            <CardTitle>Weekly Visits</CardTitle>
-            <CardDescription>
-              Visitor traffic over the past week
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={weeklyData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="day" />
-                <YAxis />
-                <Tooltip />
-                <Line 
-                  type="monotone" 
-                  dataKey="visits" 
-                  stroke="hsl(var(--primary))" 
-                  strokeWidth={2}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Visit Purposes</CardTitle>
+                <CardDescription>Breakdown of visit purposes</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={analytics?.visits_by_purpose || []}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ purpose, percent }) => `${purpose} ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="count"
+                      >
+                        {analytics?.visits_by_purpose?.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
-      {/* Hourly Distribution */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Today's Hourly Distribution</CardTitle>
-          <CardDescription>
-            Visitor check-ins by hour of the day
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={hourlyData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="hour" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="visits" fill="hsl(var(--primary))" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+        <TabsContent value="analytics" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Peak Hours</CardTitle>
+                <CardDescription>Busiest times of the day</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={analytics?.peak_hours || []}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="hour" 
+                        tickFormatter={(value) => `${value}:00`}
+                      />
+                      <YAxis />
+                      <Tooltip 
+                        labelFormatter={(value) => `${value}:00`}
+                      />
+                      <Bar dataKey="count" fill="#8884d8" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Visits by Location</CardTitle>
+                <CardDescription>Distribution across locations</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={analytics?.visits_by_location || []}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="location_name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="#00C49F" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="locations" className="space-y-4">
+          <LocationOverview />
+        </TabsContent>
+
+        <TabsContent value="recent" className="space-y-4">
+          <RecentActivity visits={recentVisits?.data || []} isLoading={isLoadingVisits} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
+}
+
+function MetricCard({ 
+  title, 
+  value, 
+  icon: Icon, 
+  isLoading 
+}: { 
+  title: string
+  value?: string | number
+  icon: any
+  isLoading: boolean 
+}) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <Icon className="h-4 w-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Skeleton className="h-8 w-20" />
+        ) : (
+          <div className="text-2xl font-bold">{value ?? '—'}</div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function LocationOverview() {
+  const { user } = useAuthStore()
+  
+  const { data: locations, isLoading } = useQuery({
+    queryKey: ['locations', user?.org_id],
+    queryFn: () => apiClient.getLocations(user!.org_id),
+    enabled: !!user?.org_id,
+  })
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {[...Array(3)].map((_, i) => (
+          <Card key={i}>
+            <CardContent className="p-6">
+              <Skeleton className="h-6 w-48 mb-2" />
+              <Skeleton className="h-4 w-32" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {locations?.data?.map((location) => (
+        <Card key={location.id}>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <MapPin className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <h3 className="font-semibold">{location.name}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {location.city}, {location.state}
+                  </p>
+                </div>
+              </div>
+              <Badge variant={location.is_active ? "default" : "secondary"}>
+                {location.is_active ? "Active" : "Inactive"}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+function RecentActivity({ visits, isLoading }: { visits: any[], isLoading: boolean }) {
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {[...Array(5)].map((_, i) => (
+          <Card key={i}>
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-4">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
+  if (visits.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-center">
+          <p className="text-muted-foreground">No recent activity</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {visits.map((visit) => (
+        <Card key={visit.id}>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Users className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">
+                    {visit.visitor?.first_name} {visit.visitor?.last_name}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {visit.visitor?.company} • {visit.purpose}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <Badge variant="outline">
+                  {visit.status}
+                </Badge>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {visit.check_in_time && format(new Date(visit.check_in_time), 'HH:mm')}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+async function handleExport(type: string) {
+  // Implementation for exporting dashboard data
+  console.log('Exporting:', type)
 }

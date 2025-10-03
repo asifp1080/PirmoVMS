@@ -1,30 +1,58 @@
-# Production Dockerfile for Web
-FROM node:20-alpine AS builder
+FROM node:20-alpine AS base
 
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-RUN npm ci
+COPY packages/contracts/package.json ./packages/contracts/
+RUN npm ci --only=production
 
-# Copy source code
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build application
+# Build the application
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Build contracts first
+WORKDIR /app/packages/contracts
 RUN npm run build
 
-# Production stage
-FROM nginx:alpine AS production
+# Build web app
+WORKDIR /app/apps/web
+RUN npm run build
 
-# Copy built assets
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Production image, copy all the files and run next
+FROM base AS runner
+WORKDIR /app
 
-# Copy nginx configuration
-COPY nginx.conf /etc/nginx/nginx.conf
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
-EXPOSE 80
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost/ || exit 1
+# Copy built application
+COPY --from=builder /app/apps/web/dist ./dist
+COPY --from=builder /app/apps/web/package.json ./package.json
 
-CMD ["nginx", "-g", "daemon off;"]
+# Copy node_modules
+COPY --from=deps /app/node_modules ./node_modules
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+# Install serve to serve the built files
+RUN npm install -g serve
+
+CMD ["serve", "-s", "dist", "-l", "3000"]
