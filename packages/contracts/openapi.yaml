@@ -1,0 +1,1291 @@
+openapi: 3.1.0
+info:
+  title: Visitor Management System API
+  description: Comprehensive API for managing visitors, visits, and organizational access control
+  version: 1.0.0
+  contact:
+    name: VMS API Support
+    email: support@vms.example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3001/api/v1
+    description: Development server
+  - url: https://api.vms.example.com/v1
+    description: Production server
+
+security:
+  - bearerAuth: []
+
+paths:
+  # Authentication
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: User login
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh access token
+      operationId: refreshToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: User logout
+      operationId: logout
+      responses:
+        '200':
+          description: Logout successful
+
+  # Organizations
+  /organizations/{orgId}:
+    get:
+      tags: [Organizations]
+      summary: Get organization details
+      operationId: getOrganization
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+      responses:
+        '200':
+          description: Organization details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+
+    put:
+      tags: [Organizations]
+      summary: Update organization
+      operationId: updateOrganization
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrganizationRequest'
+      responses:
+        '200':
+          description: Organization updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+
+  # Locations
+  /organizations/{orgId}/locations:
+    get:
+      tags: [Locations]
+      summary: List locations
+      operationId: getLocations
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: List of locations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationListResponse'
+
+    post:
+      tags: [Locations]
+      summary: Create location
+      operationId: createLocation
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLocationRequest'
+      responses:
+        '201':
+          description: Location created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+
+  /organizations/{orgId}/locations/{locationId}:
+    get:
+      tags: [Locations]
+      summary: Get location details
+      operationId: getLocation
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+        - $ref: '#/components/parameters/LocationId'
+      responses:
+        '200':
+          description: Location details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+
+    put:
+      tags: [Locations]
+      summary: Update location
+      operationId: updateLocation
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+        - $ref: '#/components/parameters/LocationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLocationRequest'
+      responses:
+        '200':
+          description: Location updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+
+    delete:
+      tags: [Locations]
+      summary: Delete location
+      operationId: deleteLocation
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+        - $ref: '#/components/parameters/LocationId'
+      responses:
+        '204':
+          description: Location deleted
+
+  # Employees
+  /organizations/{orgId}/employees:
+    get:
+      tags: [Employees]
+      summary: List employees
+      operationId: getEmployees
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: role
+          in: query
+          schema:
+            $ref: '#/components/schemas/EmployeeRole'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/EmployeeStatus'
+      responses:
+        '200':
+          description: List of employees
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeListResponse'
+
+    post:
+      tags: [Employees]
+      summary: Create employee
+      operationId: createEmployee
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEmployeeRequest'
+      responses:
+        '201':
+          description: Employee created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+
+  # Visitors
+  /organizations/{orgId}/visitors:
+    get:
+      tags: [Visitors]
+      summary: List visitors
+      operationId: getVisitors
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: search
+          in: query
+          description: Search by name, email, or company
+          schema:
+            type: string
+        - name: company
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of visitors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VisitorListResponse'
+
+    post:
+      tags: [Visitors]
+      summary: Create visitor
+      operationId: createVisitor
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVisitorRequest'
+      responses:
+        '201':
+          description: Visitor created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Visitor'
+
+  /organizations/{orgId}/visitors/{visitorId}:
+    get:
+      tags: [Visitors]
+      summary: Get visitor details
+      operationId: getVisitor
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+        - $ref: '#/components/parameters/VisitorId'
+      responses:
+        '200':
+          description: Visitor details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Visitor'
+
+    put:
+      tags: [Visitors]
+      summary: Update visitor
+      operationId: updateVisitor
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+        - $ref: '#/components/parameters/VisitorId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateVisitorRequest'
+      responses:
+        '200':
+          description: Visitor updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Visitor'
+
+    delete:
+      tags: [Visitors]
+      summary: Delete visitor
+      operationId: deleteVisitor
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+        - $ref: '#/components/parameters/VisitorId'
+      responses:
+        '204':
+          description: Visitor deleted
+
+  # Visits
+  /organizations/{orgId}/visits:
+    get:
+      tags: [Visits]
+      summary: List visits
+      operationId: getVisits
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/VisitStatus'
+        - name: purpose
+          in: query
+          schema:
+            $ref: '#/components/schemas/VisitPurpose'
+        - name: location_id
+          in: query
+          schema:
+            type: string
+        - name: host_id
+          in: query
+          schema:
+            type: string
+        - name: from_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: List of visits
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VisitListResponse'
+
+    post:
+      tags: [Visits]
+      summary: Create visit (pre-register)
+      operationId: createVisit
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVisitRequest'
+      responses:
+        '201':
+          description: Visit created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Visit'
+
+  /organizations/{orgId}/visits/{visitId}:
+    get:
+      tags: [Visits]
+      summary: Get visit details
+      operationId: getVisit
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+        - $ref: '#/components/parameters/VisitId'
+      responses:
+        '200':
+          description: Visit details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Visit'
+
+    put:
+      tags: [Visits]
+      summary: Update visit
+      operationId: updateVisit
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+        - $ref: '#/components/parameters/VisitId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateVisitRequest'
+      responses:
+        '200':
+          description: Visit updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Visit'
+
+  /organizations/{orgId}/visits/{visitId}/check-in:
+    post:
+      tags: [Visits]
+      summary: Check in visitor
+      operationId: checkInVisit
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+        - $ref: '#/components/parameters/VisitId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckInRequest'
+      responses:
+        '200':
+          description: Visitor checked in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Visit'
+
+  /organizations/{orgId}/visits/{visitId}/check-out:
+    post:
+      tags: [Visits]
+      summary: Check out visitor
+      operationId: checkOutVisit
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+        - $ref: '#/components/parameters/VisitId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckOutRequest'
+      responses:
+        '200':
+          description: Visitor checked out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Visit'
+
+  # Analytics
+  /organizations/{orgId}/analytics/visits:
+    get:
+      tags: [Analytics]
+      summary: Get visit analytics
+      operationId: getVisitAnalytics
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [day, week, month, year]
+            default: month
+        - name: from_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: location_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Visit analytics data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VisitAnalytics'
+
+  /organizations/{orgId}/analytics/export:
+    post:
+      tags: [Analytics]
+      summary: Export analytics data
+      operationId: exportAnalytics
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportRequest'
+      responses:
+        '200':
+          description: Export file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  # Webhooks
+  /organizations/{orgId}/webhooks:
+    get:
+      tags: [Webhooks]
+      summary: List webhooks
+      operationId: getWebhooks
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+      responses:
+        '200':
+          description: List of webhooks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookListResponse'
+
+    post:
+      tags: [Webhooks]
+      summary: Create webhook
+      operationId: createWebhook
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWebhookRequest'
+      responses:
+        '201':
+          description: Webhook created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    OrgId:
+      name: orgId
+      in: path
+      required: true
+      schema:
+        type: string
+    LocationId:
+      name: locationId
+      in: path
+      required: true
+      schema:
+        type: string
+    VisitorId:
+      name: visitorId
+      in: path
+      required: true
+      schema:
+        type: string
+    VisitId:
+      name: visitId
+      in: path
+      required: true
+      schema:
+        type: string
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+
+  schemas:
+    # Authentication
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        org_slug:
+          type: string
+
+    LoginResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        expires_in:
+          type: integer
+        user:
+          $ref: '#/components/schemas/Employee'
+
+    RefreshTokenRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+
+    # Core Models
+    Organization:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        domain:
+          type: string
+        logo_url:
+          type: string
+        website:
+          type: string
+        industry:
+          type: string
+        employee_count:
+          type: integer
+        time_zone:
+          type: string
+        settings:
+          type: object
+        subscription_tier:
+          type: string
+          enum: [BASIC, PROFESSIONAL, ENTERPRISE]
+        subscription_status:
+          type: string
+          enum: [ACTIVE, SUSPENDED, CANCELLED]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Location:
+      type: object
+      properties:
+        id:
+          type: string
+        org_id:
+          type: string
+        name:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        postal_code:
+          type: string
+        country:
+          type: string
+        time_zone:
+          type: string
+        phone:
+          type: string
+        capacity:
+          type: integer
+        is_active:
+          type: boolean
+        settings:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Employee:
+      type: object
+      properties:
+        id:
+          type: string
+        org_id:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/EmployeeRole'
+        is_host:
+          type: boolean
+        department:
+          type: string
+        job_title:
+          type: string
+        phone:
+          type: string
+        avatar_url:
+          type: string
+        status:
+          $ref: '#/components/schemas/EmployeeStatus'
+        last_login_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Visitor:
+      type: object
+      properties:
+        id:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        company:
+          type: string
+        photo_url:
+          type: string
+        preferred_language:
+          type: string
+        marketing_opt_in:
+          type: boolean
+        notes:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Visit:
+      type: object
+      properties:
+        id:
+          type: string
+        org_id:
+          type: string
+        location_id:
+          type: string
+        visitor_id:
+          type: string
+        host_id:
+          type: string
+        purpose:
+          $ref: '#/components/schemas/VisitPurpose'
+        status:
+          $ref: '#/components/schemas/VisitStatus'
+        scheduled_start:
+          type: string
+          format: date-time
+        scheduled_end:
+          type: string
+          format: date-time
+        check_in_time:
+          type: string
+          format: date-time
+        check_out_time:
+          type: string
+          format: date-time
+        badge_number:
+          type: string
+        qr_code:
+          type: string
+        photo_url:
+          type: string
+        signature_url:
+          type: string
+        notes:
+          type: string
+        metadata:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        # Relations
+        location:
+          $ref: '#/components/schemas/Location'
+        visitor:
+          $ref: '#/components/schemas/Visitor'
+        host:
+          $ref: '#/components/schemas/Employee'
+
+    Webhook:
+      type: object
+      properties:
+        id:
+          type: string
+        org_id:
+          type: string
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+        secret:
+          type: string
+        is_active:
+          type: boolean
+        last_success:
+          type: string
+          format: date-time
+        last_failure:
+          type: string
+          format: date-time
+        failure_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    # Enums
+    EmployeeRole:
+      type: string
+      enum: [ADMIN, RECEPTIONIST, SECURITY, MANAGER]
+
+    EmployeeStatus:
+      type: string
+      enum: [ACTIVE, INACTIVE, SUSPENDED]
+
+    VisitPurpose:
+      type: string
+      enum: [MEETING, INTERVIEW, DELIVERY, GUEST, OTHER]
+
+    VisitStatus:
+      type: string
+      enum: [PENDING, CHECKED_IN, CHECKED_OUT, NO_SHOW]
+
+    # Request/Response Types
+    CreateLocationRequest:
+      type: object
+      required: [name, address, city, time_zone]
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        postal_code:
+          type: string
+        country:
+          type: string
+          default: US
+        time_zone:
+          type: string
+        phone:
+          type: string
+        capacity:
+          type: integer
+        settings:
+          type: object
+
+    UpdateLocationRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        postal_code:
+          type: string
+        country:
+          type: string
+        time_zone:
+          type: string
+        phone:
+          type: string
+        capacity:
+          type: integer
+        is_active:
+          type: boolean
+        settings:
+          type: object
+
+    CreateEmployeeRequest:
+      type: object
+      required: [first_name, last_name, email, role]
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/EmployeeRole'
+        is_host:
+          type: boolean
+          default: false
+        department:
+          type: string
+        job_title:
+          type: string
+        phone:
+          type: string
+        location_id:
+          type: string
+
+    CreateVisitorRequest:
+      type: object
+      required: [first_name, last_name]
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        company:
+          type: string
+        preferred_language:
+          type: string
+          default: en
+        marketing_opt_in:
+          type: boolean
+          default: false
+        notes:
+          type: string
+
+    UpdateVisitorRequest:
+      type: object
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        company:
+          type: string
+        preferred_language:
+          type: string
+        marketing_opt_in:
+          type: boolean
+        notes:
+          type: string
+
+    CreateVisitRequest:
+      type: object
+      required: [visitor_id, location_id, purpose, scheduled_start]
+      properties:
+        visitor_id:
+          type: string
+        location_id:
+          type: string
+        host_id:
+          type: string
+        purpose:
+          $ref: '#/components/schemas/VisitPurpose'
+        scheduled_start:
+          type: string
+          format: date-time
+        scheduled_end:
+          type: string
+          format: date-time
+        notes:
+          type: string
+
+    UpdateVisitRequest:
+      type: object
+      properties:
+        host_id:
+          type: string
+        purpose:
+          $ref: '#/components/schemas/VisitPurpose'
+        scheduled_start:
+          type: string
+          format: date-time
+        scheduled_end:
+          type: string
+          format: date-time
+        notes:
+          type: string
+
+    CheckInRequest:
+      type: object
+      properties:
+        photo_url:
+          type: string
+        signature_url:
+          type: string
+        agreements_signed:
+          type: array
+          items:
+            type: string
+
+    CheckOutRequest:
+      type: object
+      properties:
+        notes:
+          type: string
+
+    CreateWebhookRequest:
+      type: object
+      required: [url, events]
+      properties:
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+        is_active:
+          type: boolean
+          default: true
+
+    UpdateOrganizationRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        domain:
+          type: string
+        logo_url:
+          type: string
+        website:
+          type: string
+        industry:
+          type: string
+        employee_count:
+          type: integer
+        time_zone:
+          type: string
+        settings:
+          type: object
+
+    ExportRequest:
+      type: object
+      required: [format, data_type]
+      properties:
+        format:
+          type: string
+          enum: [csv, pdf, json]
+        data_type:
+          type: string
+          enum: [visits, visitors, analytics]
+        from_date:
+          type: string
+          format: date
+        to_date:
+          type: string
+          format: date
+        filters:
+          type: object
+
+    # Analytics
+    VisitAnalytics:
+      type: object
+      properties:
+        total_visits:
+          type: integer
+        unique_visitors:
+          type: integer
+        average_duration:
+          type: number
+        peak_hours:
+          type: array
+          items:
+            type: object
+            properties:
+              hour:
+                type: integer
+              count:
+                type: integer
+        visits_by_purpose:
+          type: array
+          items:
+            type: object
+            properties:
+              purpose:
+                type: string
+              count:
+                type: integer
+        visits_by_location:
+          type: array
+          items:
+            type: object
+            properties:
+              location_id:
+                type: string
+              location_name:
+                type: string
+              count:
+                type: integer
+        daily_counts:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              count:
+                type: integer
+
+    # List Responses
+    LocationListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Location'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    EmployeeListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Employee'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    VisitorListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Visitor'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    VisitListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Visit'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    WebhookListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Webhook'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    PaginationMeta:
+      type: object
+      properties:
+        total_count:
+          type: integer
+        has_next:
+          type: boolean
+        has_previous:
+          type: boolean
+        next_cursor:
+          type: string
+        previous_cursor:
+          type: string
+
+    # Error Responses
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

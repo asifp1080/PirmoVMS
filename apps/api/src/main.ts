@@ -1,12 +1,14 @@
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { SecurityMiddleware } from '@vms/security';
-import { AppModule } from './app.module';
+import { NestFactory } from '@nestjs/core'
+import { ValidationPipe } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
+import { SecurityMiddleware } from '@vms/security'
+import helmet from 'helmet'
+import { AppModule } from './app.module'
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  const configService = app.get(ConfigService);
+  const app = await NestFactory.create(AppModule)
+  const configService = app.get(ConfigService)
 
   // Security configuration
   const securityConfig = {
@@ -17,30 +19,22 @@ async function bootstrap() {
     enableHSTS: configService.get('NODE_ENV') === 'production',
     hstsMaxAge: 31536000, // 1 year
     trustedProxies: configService.get('TRUSTED_PROXIES')?.split(',') || [],
-  };
+  }
 
-  const securityMiddleware = new SecurityMiddleware(securityConfig);
+  const securityMiddleware = new SecurityMiddleware(securityConfig)
 
   // Apply security middleware
-  app.use(securityMiddleware.getHelmetConfig());
-  app.use(securityMiddleware.getCSRFProtection());
-  app.use(securityMiddleware.getRateLimiter());
-  app.use(securityMiddleware.securityLogger());
-  app.use(securityMiddleware.sanitizeInput());
-  app.use(securityMiddleware.preventParameterPollution());
-
-  // Content type validation
-  app.use(securityMiddleware.validateContentType([
-    'application/json',
-    'application/x-www-form-urlencoded',
-    'multipart/form-data',
-  ]));
-
-  // Origin validation for production
-  if (configService.get('NODE_ENV') === 'production') {
-    const allowedOrigins = configService.get('CORS_ORIGINS')?.split(',') || [];
-    app.use(securityMiddleware.validateOrigin(allowedOrigins));
-  }
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'"],
+      },
+    },
+  }))
 
   // Global validation pipe
   app.useGlobalPipes(
@@ -52,7 +46,7 @@ async function bootstrap() {
         enableImplicitConversion: true,
       },
     }),
-  );
+  )
 
   // CORS configuration
   app.enableCors({
@@ -60,16 +54,27 @@ async function bootstrap() {
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
-  });
+  })
 
   // Global prefix
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix('api/v1')
 
-  const port = configService.get('PORT') || 3001;
-  await app.listen(port);
+  // Swagger documentation
+  const config = new DocumentBuilder()
+    .setTitle('VMS API')
+    .setDescription('Visitor Management System API')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build()
+  
+  const document = SwaggerModule.createDocument(app, config)
+  SwaggerModule.setup('api/docs', app, document)
 
-  console.log(`🚀 VMS API is running on: http://localhost:${port}/api/v1`);
-  console.log(`🔒 Security features enabled: ${Object.keys(securityConfig).filter(key => securityConfig[key]).join(', ')}`);
+  const port = configService.get('PORT') || 3001
+  await app.listen(port)
+
+  console.log(`🚀 VMS API is running on: http://localhost:${port}/api/v1`)
+  console.log(`📚 API Documentation: http://localhost:${port}/api/docs`)
 }
 
-bootstrap();
+bootstrap()

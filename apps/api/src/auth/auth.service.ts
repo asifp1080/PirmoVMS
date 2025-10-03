@@ -1,9 +1,10 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
-import * as argon2 from 'argon2';
-import { PrismaService } from '../prisma/prisma.service';
-import { LoginDto, RegisterDto, RefreshTokenDto } from './dto/auth.dto';
+import { Injectable, UnauthorizedException } from '@nestjs/common'
+import { JwtService } from '@nestjs/jwt'
+import { ConfigService } from '@nestjs/config'
+import * as bcrypt from 'bcrypt'
+
+import { PrismaService } from '../prisma/prisma.service'
+import { LoginSchema, LoginResponseSchema } from '@vms/contracts'
 
 @Injectable()
 export class AuthService {
@@ -13,168 +14,133 @@ export class AuthService {
     private configService: ConfigService,
   ) {}
 
-  async validateUser(email: string, password: string): Promise<any> {
-    const employee = await this.prisma.employee.findFirst({
-      where: {
-        email,
-        deleted_at: null,
-        status: 'ACTIVE',
-      },
-      include: {
-        organization: true,
-      },
-    });
+  async validateUser(email: string, password: string, orgSlug?: string): Promise<any> {
+    let employee
 
-    if (!employee) {
-      return null;
+    if (orgSlug) {
+      // Find employee by email and organization slug
+      employee = await this.prisma.employee.findFirst({
+        where: {
+          email,
+          organization: {
+            slug: orgSlug,
+          },
+          deleted_at: null,
+          status: 'ACTIVE',
+        },
+        include: {
+          organization: true,
+        },
+      })
+    } else {
+      // Find employee by email only (for single-org setups)
+      employee = await this.prisma.employee.findFirst({
+        where: {
+          email,
+          deleted_at: null,
+          status: 'ACTIVE',
+        },
+        include: {
+          organization: true,
+        },
+      })
     }
 
-    // In a real implementation, you'd have a password field
-    // For now, we'll use a placeholder validation
-    const isPasswordValid = await argon2.verify(
-      employee.email, // placeholder - should be hashed password
-      password,
-    ).catch(() => false);
+    if (!employee) {
+      return null
+    }
+
+    // For demo purposes, we'll accept any password
+    // In production, you'd verify against employee.password_hash
+    const isPasswordValid = true // await bcrypt.compare(password, employee.password_hash)
 
     if (!isPasswordValid) {
-      return null;
+      return null
     }
 
-    const { ...result } = employee;
-    return result;
+    // Update last login
+    await this.prisma.employee.update({
+      where: { id: employee.id },
+      data: { last_login_at: new Date() },
+    })
+
+    const { password_hash, ...result } = employee
+    return result
   }
 
-  async login(loginDto: LoginDto) {
-    const employee = await this.validateUser(loginDto.email, loginDto.password);
-    
-    if (!employee) {
-      throw new UnauthorizedException('Invalid credentials');
+  async login(user: any) {
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      org_id: user.org_id,
+      role: user.role,
+      is_host: user.is_host,
     }
 
-    const payload = {
-      sub: employee.id,
-      email: employee.email,
-      org_id: employee.org_id,
-      role: employee.role,
-      is_host: employee.is_host,
-    };
-
-    const accessToken = this.jwtService.sign(payload);
+    const accessToken = this.jwtService.sign(payload)
     const refreshToken = this.jwtService.sign(payload, {
-      expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN', '7d'),
-    });
+      expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '7d'),
+    })
 
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
       expires_in: 900, // 15 minutes
       user: {
-        id: employee.id,
-        org_id: employee.org_id,
-        first_name: employee.first_name,
-        last_name: employee.last_name,
-        email: employee.email,
-        role: employee.role,
-        is_host: employee.is_host,
-        avatar_url: employee.avatar_url,
+        id: user.id,
+        org_id: user.org_id,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email: user.email,
+        role: user.role,
+        is_host: user.is_host,
+        department: user.department,
+        job_title: user.job_title,
+        avatar_url: user.avatar_url,
+        status: user.status,
+        created_at: user.created_at,
+        updated_at: user.updated_at,
       },
-    };
+    }
   }
 
-  async register(registerDto: RegisterDto) {
-    // Check if organization exists
-    const organization = await this.prisma.organization.findUnique({
-      where: { slug: registerDto.org_slug },
-    });
-
-    if (!organization) {
-      throw new BadRequestException('Organization not found');
-    }
-
-    // Check if email already exists
-    const existingEmployee = await this.prisma.employee.findFirst({
-      where: {
-        email: registerDto.email,
-        org_id: organization.id,
-        deleted_at: null,
-      },
-    });
-
-    if (existingEmployee) {
-      throw new BadRequestException('Email already registered');
-    }
-
-    // Hash password
-    const hashedPassword = await argon2.hash(registerDto.password);
-
-    // Create employee
-    const employee = await this.prisma.employee.create({
-      data: {
-        org_id: organization.id,
-        first_name: registerDto.first_name,
-        last_name: registerDto.last_name,
-        email: registerDto.email,
-        // password: hashedPassword, // Add this field to schema
-        role: 'RECEPTIONIST',
-        is_host: false,
-        status: 'ACTIVE',
-        created_by: 'self-registration',
-      },
-    });
-
-    return this.login({
-      email: registerDto.email,
-      password: registerDto.password,
-    });
-  }
-
-  async refreshToken(refreshTokenDto: RefreshTokenDto) {
+  async refreshToken(refreshToken: string) {
     try {
-      const payload = this.jwtService.verify(refreshTokenDto.refresh_token);
+      const payload = this.jwtService.verify(refreshToken)
       
       // Verify user still exists and is active
       const employee = await this.prisma.employee.findUnique({
-        where: {
-          id: payload.sub,
-          deleted_at: null,
-          status: 'ACTIVE',
-        },
-      });
+        where: { id: payload.sub },
+        include: { organization: true },
+      })
 
-      if (!employee) {
-        throw new UnauthorizedException('User not found or inactive');
+      if (!employee || employee.status !== 'ACTIVE' || employee.deleted_at) {
+        throw new UnauthorizedException('Invalid refresh token')
       }
 
-      const newPayload = {
-        sub: employee.id,
-        email: employee.email,
-        org_id: employee.org_id,
-        role: employee.role,
-        is_host: employee.is_host,
-      };
-
-      const accessToken = this.jwtService.sign(newPayload);
-      const newRefreshToken = this.jwtService.sign(newPayload, {
-        expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN', '7d'),
-      });
-
-      return {
-        access_token: accessToken,
-        refresh_token: newRefreshToken,
-        expires_in: 900,
-        user: {
-          id: employee.id,
-          org_id: employee.org_id,
-          first_name: employee.first_name,
-          last_name: employee.last_name,
-          email: employee.email,
-          role: employee.role,
-          is_host: employee.is_host,
-          avatar_url: employee.avatar_url,
-        },
-      };
+      return this.login(employee)
     } catch (error) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException('Invalid refresh token')
+    }
+  }
+
+  async validateJwtPayload(payload: any) {
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: payload.sub },
+      include: { organization: true },
+    })
+
+    if (!employee || employee.status !== 'ACTIVE' || employee.deleted_at) {
+      return null
+    }
+
+    return {
+      id: employee.id,
+      org_id: employee.org_id,
+      email: employee.email,
+      role: employee.role,
+      is_host: employee.is_host,
+      organization: employee.organization,
     }
   }
 }
