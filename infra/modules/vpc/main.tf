@@ -1,6 +1,28 @@
+variable "name_prefix" {
+  description = "Prefix for resource names"
+  type        = string
+}
+
+variable "cidr_block" {
+  description = "CIDR block for VPC"
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "availability_zones" {
+  description = "Availability zones"
+  type        = list(string)
+}
+
+variable "tags" {
+  description = "Tags to apply to resources"
+  type        = map(string)
+  default     = {}
+}
+
 # VPC
 resource "aws_vpc" "main" {
-  cidr_block           = var.vpc_cidr
+  cidr_block           = var.cidr_block
   enable_dns_hostnames = true
   enable_dns_support   = true
 
@@ -20,11 +42,11 @@ resource "aws_internet_gateway" "main" {
 
 # Public Subnets
 resource "aws_subnet" "public" {
-  count = length(var.azs)
+  count = length(var.availability_zones)
 
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = cidrsubnet(var.vpc_cidr, 8, count.index)
-  availability_zone       = var.azs[count.index]
+  cidr_block              = cidrsubnet(var.cidr_block, 8, count.index)
+  availability_zone       = var.availability_zones[count.index]
   map_public_ip_on_launch = true
 
   tags = merge(var.tags, {
@@ -35,11 +57,11 @@ resource "aws_subnet" "public" {
 
 # Private Subnets
 resource "aws_subnet" "private" {
-  count = length(var.azs)
+  count = length(var.availability_zones)
 
   vpc_id            = aws_vpc.main.id
-  cidr_block        = cidrsubnet(var.vpc_cidr, 8, count.index + 10)
-  availability_zone = var.azs[count.index]
+  cidr_block        = cidrsubnet(var.cidr_block, 8, count.index + 10)
+  availability_zone = var.availability_zones[count.index]
 
   tags = merge(var.tags, {
     Name = "${var.name_prefix}-private-${count.index + 1}"
@@ -47,23 +69,9 @@ resource "aws_subnet" "private" {
   })
 }
 
-# Database Subnets
-resource "aws_subnet" "database" {
-  count = length(var.azs)
-
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = cidrsubnet(var.vpc_cidr, 8, count.index + 20)
-  availability_zone = var.azs[count.index]
-
-  tags = merge(var.tags, {
-    Name = "${var.name_prefix}-database-${count.index + 1}"
-    Type = "Database"
-  })
-}
-
 # Elastic IPs for NAT Gateways
 resource "aws_eip" "nat" {
-  count = length(var.azs)
+  count = length(var.availability_zones)
 
   domain = "vpc"
   depends_on = [aws_internet_gateway.main]
@@ -75,7 +83,7 @@ resource "aws_eip" "nat" {
 
 # NAT Gateways
 resource "aws_nat_gateway" "main" {
-  count = length(var.azs)
+  count = length(var.availability_zones)
 
   allocation_id = aws_eip.nat[count.index].id
   subnet_id     = aws_subnet.public[count.index].id
@@ -87,7 +95,7 @@ resource "aws_nat_gateway" "main" {
   depends_on = [aws_internet_gateway.main]
 }
 
-# Route Tables
+# Route Table for Public Subnets
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
@@ -101,8 +109,17 @@ resource "aws_route_table" "public" {
   })
 }
 
+# Route Table Associations for Public Subnets
+resource "aws_route_table_association" "public" {
+  count = length(aws_subnet.public)
+
+  subnet_id      = aws_subnet.public[count.index].id
+  route_table_id = aws_route_table.public.id
+}
+
+# Route Tables for Private Subnets
 resource "aws_route_table" "private" {
-  count = length(var.azs)
+  count = length(var.availability_zones)
 
   vpc_id = aws_vpc.main.id
 
@@ -116,50 +133,41 @@ resource "aws_route_table" "private" {
   })
 }
 
-resource "aws_route_table" "database" {
-  vpc_id = aws_vpc.main.id
-
-  tags = merge(var.tags, {
-    Name = "${var.name_prefix}-database-rt"
-  })
-}
-
-# Route Table Associations
-resource "aws_route_table_association" "public" {
-  count = length(var.azs)
-
-  subnet_id      = aws_subnet.public[count.index].id
-  route_table_id = aws_route_table.public.id
-}
-
+# Route Table Associations for Private Subnets
 resource "aws_route_table_association" "private" {
-  count = length(var.azs)
+  count = length(aws_subnet.private)
 
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private[count.index].id
 }
 
-resource "aws_route_table_association" "database" {
-  count = length(var.azs)
-
-  subnet_id      = aws_subnet.database[count.index].id
-  route_table_id = aws_route_table.database.id
+# Outputs
+output "vpc_id" {
+  description = "ID of the VPC"
+  value       = aws_vpc.main.id
 }
 
-# Database Subnet Group
-resource "aws_db_subnet_group" "main" {
-  name       = "${var.name_prefix}-db-subnet-group"
-  subnet_ids = aws_subnet.database[*].id
-
-  tags = merge(var.tags, {
-    Name = "${var.name_prefix}-db-subnet-group"
-  })
+output "vpc_cidr_block" {
+  description = "CIDR block of the VPC"
+  value       = aws_vpc.main.cidr_block
 }
 
-# ElastiCache Subnet Group
-resource "aws_elasticache_subnet_group" "main" {
-  name       = "${var.name_prefix}-cache-subnet-group"
-  subnet_ids = aws_subnet.private[*].id
+output "public_subnet_ids" {
+  description = "IDs of the public subnets"
+  value       = aws_subnet.public[*].id
+}
 
-  tags = var.tags
+output "private_subnet_ids" {
+  description = "IDs of the private subnets"
+  value       = aws_subnet.private[*].id
+}
+
+output "internet_gateway_id" {
+  description = "ID of the Internet Gateway"
+  value       = aws_internet_gateway.main.id
+}
+
+output "nat_gateway_ids" {
+  description = "IDs of the NAT Gateways"
+  value       = aws_nat_gateway.main[*].id
 }

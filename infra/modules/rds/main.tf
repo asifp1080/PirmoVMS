@@ -70,6 +70,11 @@ variable "tags" {
   default     = {}
 }
 
+variable "environment" {
+  description = "Environment name"
+  type        = string
+}
+
 # Generate random password
 resource "random_password" "db_password" {
   length  = 32

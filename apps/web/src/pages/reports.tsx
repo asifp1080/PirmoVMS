@@ -18,7 +18,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { DatePickerWithRange } from '@/components/ui/date-range-picker'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -201,19 +200,6 @@ export default function ReportsPage() {
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Date Range</label>
-              <DatePickerWithRange
-                from={dateRange.from}
-                to={dateRange.to}
-                onSelect={(range) => {
-                  if (range?.from && range?.to) {
-                    setDateRange({ from: range.from, to: range.to })
-                  }
-                }}
-              />
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -375,13 +361,8 @@ export default function ReportsPage() {
                     <YAxis />
                     <Tooltip 
                       labelFormatter={(value) => `${value}:00`}
-                      formatter={(value) => [`${value} visits`, 'Count']}
                     />
-                    <Bar 
-                      dataKey="count" 
-                      fill="#8884d8"
-                      radius={[4, 4, 0, 0]}
-                    />
+                    <Bar dataKey="count" fill="#FFBB28" />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -390,137 +371,91 @@ export default function ReportsPage() {
         </TabsContent>
 
         <TabsContent value="exports" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardHeader>
-                <CardTitle>Visit Reports</CardTitle>
+                <CardTitle>Visitor Data</CardTitle>
                 <CardDescription>
-                  Export detailed visit data and analytics
+                  Export visitor information and history
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Button 
-                    className="w-full justify-start" 
-                    variant="outline"
-                    onClick={() => handleExport('csv', 'visits')}
-                    disabled={exportMutation.isPending}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Export Visits (CSV)
-                  </Button>
-                  
-                  <Button 
-                    className="w-full justify-start" 
-                    variant="outline"
-                    onClick={() => handleExport('pdf', 'visits')}
-                    disabled={exportMutation.isPending}
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Export Visits (PDF)
-                  </Button>
-                </div>
+                <Button 
+                  className="w-full" 
+                  onClick={() => handleExport('csv', 'visitors')}
+                  disabled={exportMutation.isPending}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export CSV
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={() => handleExport('pdf', 'visitors')}
+                  disabled={exportMutation.isPending}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Export PDF
+                </Button>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Visitor Reports</CardTitle>
+                <CardTitle>Visit Records</CardTitle>
                 <CardDescription>
-                  Export visitor information and profiles
+                  Export visit logs and check-in data
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Button 
-                    className="w-full justify-start" 
-                    variant="outline"
-                    onClick={() => handleExport('csv', 'visitors')}
-                    disabled={exportMutation.isPending}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Export Visitors (CSV)
-                  </Button>
-                  
-                  <Button 
-                    className="w-full justify-start" 
-                    variant="outline"
-                    onClick={() => handleExport('json', 'visitors')}
-                    disabled={exportMutation.isPending}
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Export Visitors (JSON)
-                  </Button>
-                </div>
+                <Button 
+                  className="w-full" 
+                  onClick={() => handleExport('csv', 'visits')}
+                  disabled={exportMutation.isPending}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export CSV
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={() => handleExport('json', 'visits')}
+                  disabled={exportMutation.isPending}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Export JSON
+                </Button>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Analytics Reports</CardTitle>
+                <CardTitle>Analytics Report</CardTitle>
                 <CardDescription>
-                  Export aggregated analytics and insights
+                  Export comprehensive analytics data
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Button 
-                    className="w-full justify-start" 
-                    variant="outline"
-                    onClick={() => handleExport('csv', 'analytics')}
-                    disabled={exportMutation.isPending}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Export Analytics (CSV)
-                  </Button>
-                  
-                  <Button 
-                    className="w-full justify-start" 
-                    variant="outline"
-                    onClick={() => handleExport('pdf', 'analytics')}
-                    disabled={exportMutation.isPending}
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Export Analytics (PDF)
-                  </Button>
-                </div>
+                <Button 
+                  className="w-full" 
+                  onClick={() => handleExport('pdf', 'analytics')}
+                  disabled={exportMutation.isPending}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Full Report (PDF)
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={() => handleExport('json', 'analytics')}
+                  disabled={exportMutation.isPending}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Raw Data (JSON)
+                </Button>
               </CardContent>
             </Card>
           </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Export History</CardTitle>
-              <CardDescription>
-                Recent exports and downloads
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <FileText className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium">Visit Report - December 2024</p>
-                      <p className="text-sm text-muted-foreground">CSV • 2.3 MB • Exported 2 hours ago</p>
-                    </div>
-                  </div>
-                  <Badge variant="secondary">Completed</Badge>
-                </div>
-
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <FileText className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium">Analytics Report - Q4 2024</p>
-                      <p className="text-sm text-muted-foreground">PDF • 1.8 MB • Exported yesterday</p>
-                    </div>
-                  </div>
-                  <Badge variant="secondary">Completed</Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
     </div>

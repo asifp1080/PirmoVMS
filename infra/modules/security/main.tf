@@ -1,6 +1,23 @@
-# Application Load Balancer Security Group
+variable "name_prefix" {
+  description = "Prefix for resource names"
+  type        = string
+}
+
+variable "vpc_id" {
+  description = "VPC ID"
+  type        = string
+}
+
+variable "tags" {
+  description = "Tags to apply to resources"
+  type        = map(string)
+  default     = {}
+}
+
+# ALB Security Group
 resource "aws_security_group" "alb" {
-  name_prefix = "${var.name_prefix}-alb-"
+  name        = "${var.name_prefix}-alb-sg"
+  description = "Security group for Application Load Balancer"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -29,29 +46,26 @@ resource "aws_security_group" "alb" {
   tags = merge(var.tags, {
     Name = "${var.name_prefix}-alb-sg"
   })
-
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
 # ECS Security Group
 resource "aws_security_group" "ecs" {
-  name_prefix = "${var.name_prefix}-ecs-"
+  name        = "${var.name_prefix}-ecs-sg"
+  description = "Security group for ECS tasks"
   vpc_id      = var.vpc_id
 
   ingress {
     description     = "HTTP from ALB"
-    from_port       = 3001
-    to_port         = 3001
+    from_port       = 3000
+    to_port         = 3000
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
   }
 
   ingress {
-    description     = "HTTP from ALB"
-    from_port       = 80
-    to_port         = 80
+    description     = "API from ALB"
+    from_port       = 3001
+    to_port         = 3001
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
   }
@@ -66,15 +80,12 @@ resource "aws_security_group" "ecs" {
   tags = merge(var.tags, {
     Name = "${var.name_prefix}-ecs-sg"
   })
-
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
 # RDS Security Group
-resource "aws_security_group" "database" {
-  name_prefix = "${var.name_prefix}-db-"
+resource "aws_security_group" "rds" {
+  name        = "${var.name_prefix}-rds-sg"
+  description = "Security group for RDS database"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -93,17 +104,14 @@ resource "aws_security_group" "database" {
   }
 
   tags = merge(var.tags, {
-    Name = "${var.name_prefix}-db-sg"
+    Name = "${var.name_prefix}-rds-sg"
   })
-
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
-# ElastiCache Security Group
+# Redis Security Group
 resource "aws_security_group" "redis" {
-  name_prefix = "${var.name_prefix}-redis-"
+  name        = "${var.name_prefix}-redis-sg"
+  description = "Security group for ElastiCache Redis"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -124,8 +132,25 @@ resource "aws_security_group" "redis" {
   tags = merge(var.tags, {
     Name = "${var.name_prefix}-redis-sg"
   })
+}
 
-  lifecycle {
-    create_before_destroy = true
-  }
+# Outputs
+output "alb_security_group_id" {
+  description = "ID of the ALB security group"
+  value       = aws_security_group.alb.id
+}
+
+output "ecs_security_group_id" {
+  description = "ID of the ECS security group"
+  value       = aws_security_group.ecs.id
+}
+
+output "rds_security_group_id" {
+  description = "ID of the RDS security group"
+  value       = aws_security_group.rds.id
+}
+
+output "redis_security_group_id" {
+  description = "ID of the Redis security group"
+  value       = aws_security_group.redis.id
 }

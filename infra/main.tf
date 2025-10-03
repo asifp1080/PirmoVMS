@@ -77,6 +77,8 @@ module "database" {
   backup_window          = var.db_backup_window
   maintenance_window     = var.db_maintenance_window
   
+  environment = var.environment
+  
   tags = local.common_tags
 }
 
@@ -390,4 +392,10 @@ resource "aws_cloudwatch_metric_alarm" "api_memory_high" {
   }
 
   tags = local.common_tags
+}
+
+variable "environment" {
+  description = "Environment name"
+  type        = string
+  default     = "staging"
 }
